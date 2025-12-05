@@ -1,114 +1,118 @@
-import threading
-from queue import Queue
-import time
+
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import scrolledtext, messagebox
 
-# ================================
-#   ThreadPool (Same Logic)
-# ================================
+class V3Skeleton:
+    def __init__(self, root):
+        self.root = root
+        root.title("ThreadPool GUI — Version 3 (Design Prototype)")
+        root.geometry("800x600")
 
-class ThreadPool:
-    def __init__(self, num_threads):
-        self.tasks = Queue()
-        self.stop = False
-        self.workers = []
-        self.task_count = 0
-        self.lock = threading.Lock()
+        # Left control panel
+        self.left = tk.Frame(root, width=280, bg="#f0f0f0")
+        self.left.pack(side="left", fill="y", padx=10, pady=10)
 
-        for i in range(num_threads):
-            t = threading.Thread(target=self.worker, daemon=True)
-            t.start()
-            self.workers.append(t)
+        tk.Label(self.left, text="ThreadPool Controller", font=("Arial", 14, "bold"), bg="#f0f0f0")\
+            .pack(pady=(6,12))
 
-    def worker(self):
-        while not self.stop:
-            task = self.tasks.get()
-            if task is None:
-                break
-            task()
-            with self.lock:
-                self.task_count -= 1
-            self.tasks.task_done()
+        tk.Label(self.left, text="Threads:", bg="#f0f0f0").pack(anchor="w", padx=10)
+        self.thread_entry = tk.Entry(self.left, width=10)
+        self.thread_entry.insert(0, "4")
+        self.thread_entry.pack(padx=10, pady=6)
 
-    def add_task(self, func):
-        with self.lock:
-            self.task_count += 1
-        self.tasks.put(func)
+        self.create_btn = tk.Button(self.left, text="Create Pool", width=20, bg="#4CAF50", fg="white",
+                                    command=self.create_pool)
+        self.create_btn.pack(padx=10, pady=6)
 
-    def shutdown(self):
-        self.stop = True
-        for _ in self.workers:
-            self.tasks.put(None)
-        for t in self.workers:
-            t.join()
+        self.add_btn = tk.Button(self.left, text="Add Task", width=20, bg="#2196F3", fg="white",
+                                 command=self.add_task, state="disabled")
+        self.add_btn.pack(padx=10, pady=6)
 
+        self.shutdown_btn = tk.Button(self.left, text="Shutdown", width=20, bg="#f44336", fg="white",
+                                      command=self.shutdown_pool, state="disabled")
+        self.shutdown_btn.pack(padx=10, pady=6)
 
-# ================================
-#             GUI
-# ================================
+        # Status labels
+        self.status_pool = tk.Label(self.left, text="Pool Status: Not created", bg="#f0f0f0")
+        self.status_pool.pack(padx=10, pady=(20,2))
+        self.status_workers = tk.Label(self.left, text="Workers: 0", bg="#f0f0f0")
+        self.status_workers.pack(padx=10, pady=2)
+        self.status_queued = tk.Label(self.left, text="Queued: 0", bg="#f0f0f0")
+        self.status_queued.pack(padx=10, pady=2)
 
-class GUI:
-    def __init__(self, pool):
-        self.pool = pool
+        # Right panel: queue visualization and log
+        self.right = tk.Frame(root, bg="#ffffff")
+        self.right.pack(side="right", expand=True, fill="both", padx=10, pady=10)
 
-        self.window = tk.Tk()
-        self.window.title("Thread Manager - Version 2 GUI")
-        self.window.geometry("420x350")
-        self.window.configure(bg="#1e1e1e")
+        tk.Label(self.right, text="Task Queue (visual):", font=("Arial", 12)).pack(anchor="nw")
+        self.canvas = tk.Canvas(self.right, height=80, bg="#ffffff", highlightthickness=1, highlightbackground="#ddd")
+        self.canvas.pack(fill="x", pady=(6,12))
 
-        # ---------- Title ----------
-        title = tk.Label(self.window, text="Thread Management Dashboard",
-                         font=("Arial", 16, "bold"), fg="white", bg="#1e1e1e")
-        title.pack(pady=15)
+        tk.Label(self.right, text="Live Log:", font=("Arial", 12)).pack(anchor="nw")
+        self.log = scrolledtext.ScrolledText(self.right, state="disabled", height=20)
+        self.log.pack(fill="both", expand=True, pady=(6,0))
 
-        # ---------- Task Counter ----------
-        self.task_label = tk.Label(self.window, text="Tasks in queue: 0",
-                                   font=("Arial", 14), fg="#00FFAA", bg="#1e1e1e")
-        self.task_label.pack(pady=5)
+        # Skeleton state (no real pool)
+        self.pool_created = False
+        self.task_id_counter = 0
+        self.visual_items = []  # for queued task rectangles
 
-        # ---------- Active Threads ----------
-        self.thread_label = tk.Label(self.window, text="Active threads: 0",
-                                     font=("Arial", 14), fg="#00D0FF", bg="#1e1e1e")
-        self.thread_label.pack(pady=5)
+    # Button handlers (stubs)
+    def create_pool(self):
+        if self.pool_created:
+            messagebox.showinfo("Info", "Pool already created")
+            return
+        try:
+            k = int(self.thread_entry.get())
+            if k <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Enter a valid positive integer for threads")
+            return
 
-        # ---------- Add Task Button ----------
-        self.add_btn = tk.Button(self.window, text="Add Task",
-                                 font=("Arial", 14), bg="#4CAF50",
-                                 fg="white", width=15, command=self.add_task)
-        self.add_btn.pack(pady=20)
+        # Enable buttons (actual pool creation will replace this)
+        self.pool_created = True
+        self.status_pool.config(text=f"Pool Status: Running")
+        self.status_workers.config(text=f"Workers: {k}")
+        self.add_btn.config(state="normal")
+        self.shutdown_btn.config(state="normal")
+        self.log_message(f"Pool created with {k} workers (skeleton)")
 
-        # Auto update labels every 500ms
-        self.update_gui()
-
-        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    # Add new task
     def add_task(self):
-        self.pool.add_task(lambda: time.sleep(1))
-        messagebox.showinfo("Task Added", "Your task has been added to the queue!")
+        if not self.pool_created:
+            messagebox.showwarning("Warning", "Create pool first")
+            return
+        self.task_id_counter += 1
+        tid = self.task_id_counter
+        # Add visual rectangle for queued task
+        x = 10 + len(self.visual_items) * 60
+        rect = self.canvas.create_rectangle(x, 10, x+50, 60, fill="#ffd966")
+        txt = self.canvas.create_text(x+25, 35, text=str(tid))
+        self.visual_items.append((rect, txt))
+        self.status_queued.config(text=f"Queued: {len(self.visual_items)}")
+        self.log_message(f"Task {tid} queued (skeleton)")
+        # NOTE: worker execution logic to remove rectangles will be implemented later
 
-    # Live update GUI
-    def update_gui(self):
-        self.task_label.config(text=f"Tasks in queue: {self.pool.task_count}")
-        self.thread_label.config(text=f"Active threads: {len(self.pool.workers)}")
+    def shutdown_pool(self):
+        if not self.pool_created:
+            return
+        self.pool_created = False
+        self.status_pool.config(text="Pool Status: Not created")
+        self.status_workers.config(text="Workers: 0")
+        self.add_btn.config(state="disabled")
+        self.shutdown_btn.config(state="disabled")
+        self.canvas.delete("all")
+        self.visual_items.clear()
+        self.status_queued.config(text="Queued: 0")
+        self.log_message("Pool shutdown (skeleton)")
 
-        self.window.after(500, self.update_gui)
-
-    # Safe shutdown
-    def on_close(self):
-        self.pool.shutdown()
-        self.window.destroy()
-
-    def run(self):
-        self.window.mainloop()
-
-
-# ================================
-#           MAIN
-# ================================
+    def log_message(self, s):
+        self.log.config(state="normal")
+        self.log.insert("end", s + "\n")
+        self.log.see("end")
+        self.log.config(state="disabled")
 
 if __name__ == "__main__":
-    pool = ThreadPool(4)   # 4 worker threads
-    gui = GUI(pool)
-    gui.run()
+    root = tk.Tk()
+    app = V3Skeleton(root)
+    root.mainloop()
